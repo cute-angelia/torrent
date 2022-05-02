@@ -2,16 +2,19 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	_ "github.com/anacrolix/envpprof"
 	"github.com/anacrolix/tagflag"
 
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/bencode"
+	"github.com/cute-angelia/go-utils/syntax/ijson"
 )
 
 func main() {
@@ -41,14 +44,29 @@ func main() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+
+			startTime := time.Now()
+
 			<-t.GotInfo()
 			mi := t.Metainfo()
+
+			// 修改后赋值
+			nName := ""
+			for _, runeValue := range t.Info().Name {
+				nName += fmt.Sprintf("_%c", runeValue)
+			}
+			t.Info().Name = nName
+			mi.InfoBytes, _ = bencode.Marshal(t.Info())
+			log.Println(ijson.Pretty(t.Info()))
+
 			t.Drop()
 			f, err := os.Create(t.Info().Name + ".torrent")
 			if err != nil {
 				log.Fatalf("error creating torrent metainfo file: %s", err)
 			}
 			defer f.Close()
+
+			log.Println("转化种子成功", time.Since(startTime))
 			err = bencode.NewEncoder(f).Encode(mi)
 			if err != nil {
 				log.Fatalf("error writing torrent metainfo file: %s", err)
